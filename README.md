@@ -21,9 +21,18 @@
 
 ## 🚀 使用方法
 
-### 1. 环境准备
+### 1. 环境准备 (Armbian/Linux)
 
-确保你的系统已安装 Python 3、Chrome 浏览器和对应版本的 ChromeDriver。
+本项目依赖 Python 3 和 Chromium 浏览器。请在终端执行以下命令进行安装：
+
+**第一步：安装系统级依赖 (浏览器和驱动)**
+```bash
+sudo apt update
+sudo apt install python3-pip chromium chromium-driver -y
+```
+
+**第二步：安装 Python 依赖**
+pip3 install -r requirements.txt
 
 ### 2. 配置回复规则
 
