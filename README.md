@@ -32,7 +32,9 @@ sudo apt install python3-pip chromium chromium-driver -y
 ```
 
 **第二步：安装 Python 依赖**
+```bash
 pip3 install -r requirements.txt
+```
 
 ### 2. 配置回复规则
 
