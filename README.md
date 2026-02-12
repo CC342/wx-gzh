@@ -64,8 +64,8 @@ python3 format.cookies.py
 使用管理脚本启动服务：
 
 ```bash
-chmod +x menu.sh
-./menu.sh
+chmod +x gzh.sh
+./gzh.sh
 
 ```
 
