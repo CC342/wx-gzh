@@ -26,11 +26,11 @@ def kill_zombies():
 # --- 时间调度逻辑 ---
 def get_dynamic_interval():
     hour = datetime.datetime.now().hour
-    if 17 <= hour < 23: return 180, "晚间高峰"
+    if 17 <= hour < 22: return 60, "晚间高峰"
     elif 9 <= hour < 17: return 240, "白天常态"
     elif 6 <= hour < 9: return 600, "早晨"
-    elif 2 <= hour < 6: return 3600, "深夜休眠"
-    else: return 1800, "午夜轮询"
+    elif 1 <= hour < 6: return 3600, "深夜休眠"
+    else: return 100, "午夜轮询" 
 
 # --- 辅助函数 ---
 def get_current_time():
@@ -50,9 +50,22 @@ def get_auto_reply_content(article_title):
     except: return None
 
 def format_random_msg(content):
+    # 1. 温情治愈风 
     tmpl_1 = f"这份打赏对我来说，不仅仅是一杯咖啡，更是一份“请继续坚持下去”的鼓励。\n\n📩 给你的回礼：{content}\n\n愿这里的每一部剧，都能治愈你的某个深夜。🌙"
-    tmpl_2 = f"在茫茫人海中，遇到品味相似的人，本就是一件幸事。\n\n📩 给你的回礼：{content}\n\n愿这里的每一部剧，都能治愈你的某个深夜。🌙"
-    return random.choice([tmpl_1, tmpl_2])
+    # 2. 知音难觅风 
+    tmpl_2 = f"在茫茫人海中，遇到品味相似的人，本就是一件幸事。\n\n📩 给你的回礼：{content}\n\n很高兴光影世界里有你同行，周末愉快。🎬"
+    # 3. 俏皮吃货风 
+    tmpl_3 = f"叮！捕捉到一枚品味超棒的野生剧迷！感谢你的“投喂”~ 🍿\n\n📩 你的追剧粮草已备好：{content}\n\n准备好零食，立刻开启快乐时光吧！🎉"
+    # 4. 极简直接风 
+    tmpl_4 = f"感谢你的支持与鼓励，这是我持续更新的最大动力！\n\n📩 资源已就绪：{content}\n\n如果链接失效或遇到播放问题，随时在后台留言告诉我。📺"
+    # 5. 文艺青年风 
+    tmpl_5 = f"我们都在别人的故事里，流着自己的眼泪。谢谢你的慷慨支持。\n\n📩 为你奉上：{content}\n\n愿这部作品，能为你带来一段沉浸的好时光。🎞️"
+    # 6. 豪爽老铁风 
+    tmpl_6 = f"谢啦！收到你的心意了。废话不多说，硬货直接奉上！\n\n📩 拿走不谢：{content}\n\n挑个舒服的姿势，戴上耳机慢慢看~ 🛋️"
+
+    # 将所有模板放入列表，随机抽取一个返回
+    templates = [tmpl_1, tmpl_2, tmpl_3, tmpl_4, tmpl_5, tmpl_6]
+    return random.choice(templates)
 
 def is_record_processed(nickname, title, money, time_str):
     if not os.path.exists(JSON_FILE): return False
@@ -86,9 +99,18 @@ def save_record_final(nickname, title, money, status, time_str):
         log(f"记录已归档: {nickname}")
 
 def record_failure(nickname, title, money):
+    # 【核心修改】：防重复刷屏机制
+    log_str = f"用户: {nickname} | 金额: {money} | 文章: {title} | 原因: 搜索不到(可能未关注公众号)"
+    
+    # 如果日志里已经有他了，就不重复写入文本，避免 txt 文件爆炸
+    if os.path.exists(FAIL_LOG):
+        with open(FAIL_LOG, "r", encoding="utf-8") as f:
+            if log_str in f.read():
+                return 
+                
     with open(FAIL_LOG, "a", encoding="utf-8") as f:
-        f.write(f"[{get_current_time()}] 用户: {nickname} | 金额: {money} | 文章: {title} | 原因: 搜索不到(可能未关注公众号)\n")
-    log(f"⚠️ 已将 {nickname} 加入人工处理名单")
+        f.write(f"[{get_current_time()}] {log_str}\n")
+    log(f"⚠️ {nickname} 未关注，已加入自动重试队列")
 
 def get_existing_count(title):
     if not os.path.exists(JSON_FILE): return -1
@@ -145,7 +167,7 @@ def send_private_msg(driver, token, nickname, content_info):
 
         # 4. 跳转并发送
         driver.get(chat_url)
-        time.sleep(4)
+        time.sleep(5)
 
         full_msg = format_random_msg(content_info)
         
@@ -164,11 +186,13 @@ def send_private_msg(driver, token, nickname, content_info):
             if "disabled" not in send_btn.get_attribute("class"):
                 send_btn.click()
                 log(f"✅ 私信发送成功 (ID穿透版)")
-                return True
             else:
                 driver.execute_script("arguments[0].removeAttribute('disabled'); arguments[0].classList.remove('weui-desktop-btn_disabled'); arguments[0].click();", send_btn)
                 log(f"✅ (强制)私信发送成功 (ID穿透版)")
-                return True
+            
+            time.sleep(3)
+            return True
+            
         except:
             log("❌ 输入框/按钮异常")
             return False
@@ -187,6 +211,7 @@ def run_once():
     options.add_argument('--disable-gpu')
     options.add_argument('--disable-extensions')
     options.add_argument('--blink-settings=imagesEnabled=false') # 禁图，速度极快
+    options.add_argument('--window-size=1920,1080') # 防页面挤压变形
     options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
     driver = webdriver.Chrome(service=Service(CHROME_DRIVER_PATH), options=options)
@@ -287,10 +312,10 @@ def run_once():
                                     # 尝试发送 (此时调用的是新版底层 ID 直通车函数)
                                     send_success = send_private_msg(driver, token, n, reply_info)
                                     
+                                    # 【核心修改】：只有发送成功才归档，失败就一直重试直到他关注！
                                     if send_success:
                                         save_record_final(n, title, m, s, t)
                                     else:
-                                        save_record_final(n, title, m, s, t)
                                         record_failure(n, title, m)
                                     
                                     log(">>> 本次处理完毕，立即准备重启扫描...")
