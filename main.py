@@ -50,20 +50,13 @@ def get_auto_reply_content(article_title):
     except: return None
 
 def format_random_msg(content):
-    # 1. 温情治愈风 
     tmpl_1 = f"这份打赏对我来说，不仅仅是一杯咖啡，更是一份“请继续坚持下去”的鼓励。\n\n📩 给你的回礼：{content}\n\n愿这里的每一部剧，都能治愈你的某个深夜。🌙"
-    # 2. 知音难觅风 
     tmpl_2 = f"在茫茫人海中，遇到品味相似的人，本就是一件幸事。\n\n📩 给你的回礼：{content}\n\n很高兴光影世界里有你同行，周末愉快。🎬"
-    # 3. 俏皮吃货风 
     tmpl_3 = f"叮！捕捉到一枚品味超棒的野生剧迷！感谢你的“投喂”~ 🍿\n\n📩 你的追剧粮草已备好：{content}\n\n准备好零食，立刻开启快乐时光吧！🎉"
-    # 4. 极简直接风 
     tmpl_4 = f"感谢你的支持与鼓励，这是我持续更新的最大动力！\n\n📩 资源已就绪：{content}\n\n如果链接失效或遇到播放问题，随时在后台留言告诉我。📺"
-    # 5. 文艺青年风 
     tmpl_5 = f"我们都在别人的故事里，流着自己的眼泪。谢谢你的慷慨支持。\n\n📩 为你奉上：{content}\n\n愿这部作品，能为你带来一段沉浸的好时光。🎞️"
-    # 6. 豪爽老铁风 
     tmpl_6 = f"谢啦！收到你的心意了。废话不多说，硬货直接奉上！\n\n📩 拿走不谢：{content}\n\n挑个舒服的姿势，戴上耳机慢慢看~ 🛋️"
 
-    # 将所有模板放入列表，随机抽取一个返回
     templates = [tmpl_1, tmpl_2, tmpl_3, tmpl_4, tmpl_5, tmpl_6]
     return random.choice(templates)
 
@@ -99,10 +92,9 @@ def save_record_final(nickname, title, money, status, time_str):
         log(f"记录已归档: {nickname}")
 
 def record_failure(nickname, title, money):
-    # 【核心修改】：防重复刷屏机制
+    # 防重复刷屏机制
     log_str = f"用户: {nickname} | 金额: {money} | 文章: {title} | 原因: 搜索不到(可能未关注公众号)"
     
-    # 如果日志里已经有他了，就不重复写入文本，避免 txt 文件爆炸
     if os.path.exists(FAIL_LOG):
         with open(FAIL_LOG, "r", encoding="utf-8") as f:
             if log_str in f.read():
@@ -110,7 +102,7 @@ def record_failure(nickname, title, money):
                 
     with open(FAIL_LOG, "a", encoding="utf-8") as f:
         f.write(f"[{get_current_time()}] {log_str}\n")
-    log(f"⚠️ {nickname} 未关注，已加入自动重试队列")
+    log(f"⚠️ {nickname} 未关注/搜不到，已加入自动重试队列")
 
 def get_existing_count(title):
     if not os.path.exists(JSON_FILE): return -1
@@ -131,11 +123,17 @@ def send_private_msg(driver, token, nickname, content_info):
         driver.get(user_tag_url)
         time.sleep(4)
 
-        # 2. 搜索用户
+        # 2. 搜索用户 (防 Emoji 崩溃版)
         try:
             search_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.frm_input, input.jsSearchInput")))
             search_input.clear()
-            search_input.send_keys(nickname)
+            
+            # 使用 JS 直接赋值代替 send_keys，绕过 ChromeDriver 的 BMP 字符限制 (完美解决 Emoji 报错)
+            driver.execute_script("""
+                arguments[0].value = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+            """, search_input, nickname)
             time.sleep(1)
             
             search_input.send_keys(Keys.ENTER)
@@ -207,11 +205,10 @@ def run_once():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    # 神级省内存参数
     options.add_argument('--disable-gpu')
     options.add_argument('--disable-extensions')
-    options.add_argument('--blink-settings=imagesEnabled=false') # 禁图，速度极快
-    options.add_argument('--window-size=1920,1080') # 防页面挤压变形
+    options.add_argument('--blink-settings=imagesEnabled=false') # 禁图开启，极限省内存
+    options.add_argument('--window-size=1920,1080') # 撑大屏幕，防止布局变形
     options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
     driver = webdriver.Chrome(service=Service(CHROME_DRIVER_PATH), options=options)
@@ -242,7 +239,6 @@ def run_once():
             total_list_pages = int(driver.find_elements(By.CLASS_NAME, "weui-desktop-pagination__num")[-1].text)
         except: total_list_pages = 5
 
-        # 遍历列表
         for current_list_page in range(1, total_list_pages + 1): 
             if current_list_page > 1:
                 driver.get(reward_url)
@@ -309,10 +305,10 @@ def run_once():
                                         log(f"⚠️ 暂无回复配置，跳过: {title}")
                                         continue
                                     
-                                    # 尝试发送 (此时调用的是新版底层 ID 直通车函数)
+                                    # 尝试发送
                                     send_success = send_private_msg(driver, token, n, reply_info)
                                     
-                                    # 【核心修改】：只有发送成功才归档，失败就一直重试直到他关注！
+                                    # 只有发送成功才归档，失败进入无情重试死循环
                                     if send_success:
                                         save_record_final(n, title, m, s, t)
                                     else:
@@ -331,7 +327,6 @@ def run_once():
                                     time.sleep(3)
                                 except: break
                         
-                        # 回列表
                         driver.get(reward_url)
                         time.sleep(3)
                         try:
@@ -347,13 +342,13 @@ def run_once():
         log(f"运行出错: {e}")
     finally:
         driver.quit()
-        kill_zombies() # 执行暴力清理，释放资源
+        kill_zombies() # 执行暴力清理
         return did_work
 
 # --- 守护进程 ---
 if __name__ == "__main__":
-    print(f"=== 微信自动回复机器人启动 (终极 ID 穿透版) ===")
-    kill_zombies() # 启动前先清场
+    print(f"=== 微信自动回复机器人启动 (终极防 Emoji 崩溃版) ===")
+    kill_zombies() 
     
     while True:
         try:
