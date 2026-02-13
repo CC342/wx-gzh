@@ -3,10 +3,10 @@
 #给执行权限 chmod +x gzh.sh
 
 # ================= 配置区 =================
-APP_NAME="main.py"  # 你的 Python 脚本名
+APP_NAME="main.py"               # 你的 Python 主程序名
 LOG_FILE="bot.log"               # 日志文件名
-PYTHON_CMD="python3 -u"             # Python 命令
-WORK_DIR="/mnt/sda/wechat"       # ❗这里指定了具体的工作目录❗
+PYTHON_CMD="python3 -u"          # Python 命令 (带 -u 保证实时输出)
+WORK_DIR="/mnt/sda/wechat"       # 你的工作目录
 # =========================================
 
 # 颜色定义
@@ -49,17 +49,24 @@ start_bot() {
     fi
 }
 
-# 停止逻辑
+# 停止逻辑 (已加入清理僵尸进程功能)
 stop_bot() {
     check_pid
     if [ -n "$PID" ]; then
-        echo -e "${YELLOW}>>> 正在停止 PID: $PID ...${PLAIN}"
+        echo -e "${YELLOW}>>> 正在停止 Python 主进程 (PID: $PID) ...${PLAIN}"
         kill -9 $PID
         sleep 1
-        echo -e "${RED}>>> 已停止。${PLAIN}"
+        echo -e "${RED}>>> Python 主进程已停止。${PLAIN}"
     else
-        echo -e "${RED}>>> 程序未运行。${PLAIN}"
+        echo -e "${RED}>>> Python 主进程未运行。${PLAIN}"
     fi
+    
+    # 核心新增：无差别清理残留的 Chrome/Chromium 进程，拯救内存
+    echo -e "${YELLOW}>>> 正在清理后台残留的 Chromium/Chrome 浏览器进程...${PLAIN}"
+    pkill -9 -f chromium >/dev/null 2>&1
+    pkill -9 -f chrome >/dev/null 2>&1
+    pkill -9 -f chromedriver >/dev/null 2>&1
+    echo -e "${GREEN}>>> 战场清理完毕！Armbian 内存已完全释放。${PLAIN}"
 }
 
 # 查看日志
@@ -92,8 +99,8 @@ while true; do
     
     echo -e "----------------------------------------"
     echo -e "${GREEN} 1.${PLAIN} 启动机器人"
-    echo -e "${RED} 2.${PLAIN} 停止机器人"
-    echo -e "${YELLOW} 3.${PLAIN} 重启机器人"
+    echo -e "${RED} 2.${PLAIN} 停止并清理内存"
+    echo -e "${YELLOW} 3.${PLAIN} 重启机器人 (断网/更新代码后推荐)"
     echo -e "${BLUE} 4.${PLAIN} 查看实时日志"
     echo -e " 0. 退出菜单"
     echo -e "----------------------------------------"
